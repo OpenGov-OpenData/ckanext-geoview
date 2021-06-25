@@ -285,9 +285,12 @@ class SHPView(GeoViewBase):
 
     def can_view(self, data_dict):
         resource = data_dict["resource"]
-        format_lower = resource["format"].lower()
+        resource_name_lower = resource.get("name", "").lower()
+        format_lower = resource.get("format", "").lower()
 
         if format_lower in self.SHP:
+            return self.same_domain or self.proxy_enabled
+        elif resource_name_lower == "shapefile" and format_lower == "zip":
             return self.same_domain or self.proxy_enabled
         return False
 
