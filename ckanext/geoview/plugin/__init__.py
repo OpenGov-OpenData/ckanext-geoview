@@ -94,7 +94,13 @@ class OLGeoView(GeoViewMixin, GeoViewBase):
 
     def can_view(self, data_dict):
         format_lower = data_dict["resource"].get("format", "").lower()
-        same_domain = on_same_domain(data_dict)
+        same_domain = False
+        try:
+            same_domain = on_same_domain(data_dict)
+        except KeyError as e:
+            log.error(
+                "Unable to determine if url is on same domain: {}".format(e)
+            )
 
         # Guess from file extension
         if not format_lower and data_dict["resource"].get("url"):
@@ -141,7 +147,13 @@ class OLGeoView(GeoViewMixin, GeoViewBase):
     def setup_template_variables(self, context, data_dict):
         import ckanext.resourceproxy.plugin as proxy
 
-        same_domain = on_same_domain(data_dict)
+        same_domain = False
+        try:
+            same_domain = on_same_domain(data_dict)
+        except KeyError as e:
+            log.error(
+                "Unable to determine if url is on same domain: {}".format(e)
+            )
 
         if not data_dict["resource"].get("format"):
             data_dict["resource"][
@@ -192,7 +204,13 @@ class GeoJSONView(GeoViewBase):
 
         format_lower = resource.get("format", "").lower()
 
-        same_domain = on_same_domain(data_dict)
+        same_domain = False
+        try:
+            same_domain = on_same_domain(data_dict)
+        except KeyError as e:
+            log.error(
+                "Unable to determine if url is on same domain: {}".format(e)
+            )
 
         if format_lower in self.GeoJSON:
             return same_domain or self.proxy_enabled
