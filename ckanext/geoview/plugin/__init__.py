@@ -5,11 +5,11 @@ import logging
 import mimetypes
 from six.moves.urllib.parse import urlparse
 
-import ckantoolkit as toolkit
 
 from ckan import plugins as p
 from ckan.common import json
 from ckan.lib.datapreview import on_same_domain
+from ckan.plugins import toolkit
 
 import ckanext.geoview.utils as utils
 
@@ -258,9 +258,16 @@ class WMTSView(GeoViewBase):
     def can_view(self, data_dict):
         resource = data_dict["resource"]
         format_lower = resource.get("format", "").lower()
+        same_domain = False
+        try:
+            same_domain = on_same_domain(data_dict)
+        except KeyError as e:
+            log.error(
+                "Unable to determine if url is on same domain: {}".format(e)
+            )
 
         if format_lower in self.WMTS:
-            return self.same_domain or self.proxy_enabled
+            return same_domain or self.proxy_enabled
         return False
 
     def view_template(self, context, data_dict):
@@ -307,9 +314,16 @@ class SHPView(GeoViewBase):
         name_lower = ""
         if resource.get("name"):
             name_lower = resource.get("name", "").lower()
+        same_domain = False
+        try:
+            same_domain = on_same_domain(data_dict)
+        except KeyError as e:
+            log.error(
+                "Unable to determine if url is on same domain: {}".format(e)
+            )
 
         if format_lower in self.SHP or any([shp in name_lower for shp in self.SHP]):
-            return self.same_domain or self.proxy_enabled
+            return same_domain or self.proxy_enabled
         return False
 
     def view_template(self, context, data_dict):
