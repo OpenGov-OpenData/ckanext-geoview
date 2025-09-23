@@ -168,6 +168,60 @@ ol.proj.addProjection(createEPSG4326Proj('EPSG:4326:LONLAT', 'enu'));
         }
     };
 
+    OL_HELPERS.createKMLLayer = function (url) {
+      let kmlLayer;
+
+      // Helper: extract <name> from KML XML string
+      function extractKmlName(xmlText) {
+        try {
+          var doc = new DOMParser().parseFromString(xmlText, "application/xml");
+          var nameNode =
+            doc.querySelector("kml > Document > name") ||
+            doc.querySelector("kml > name") ||
+            doc.querySelector("Document > name") ||
+            doc.querySelector("name");
+          return nameNode && nameNode.textContent || null;
+        } catch (e) { return null; }
+      }
+
+      const format = new ol.format.KML();
+
+      const source = new ol.source.Vector({
+        loader: function(extent, resolution, projection) {
+          this.setState(ol.source.State.LOADING);
+          fetch(url)
+            .then(r => {
+              if (!r.ok) throw new Error(`HTTP ${r.status}`);
+              return r.text();
+            })
+            .then(text => {
+              // Set layer title from <name>
+              const docName = extractKmlName(text);
+              if (docName && kmlLayer) kmlLayer.set('title', docName);
+
+              const feats = format.readFeatures(text, { featureProjection: projection });
+              this.addFeatures(feats);
+              this.set('waitingOnFirstData', false);
+              this.setState(ol.source.State.READY);
+            })
+            .catch(err => {
+              this.set('waitingOnFirstData', false);
+              this.setState(ol.source.State.ERROR);
+              this.set('error', err);
+            });
+        }
+      });
+
+      source.set('waitingOnFirstData', true);
+
+      kmlLayer = new ol.layer.Vector({
+        style : OL_HELPERS.DEFAULT_STYLEMAP.default,
+        title : 'KML',
+        source: source
+      });
+
+      return kmlLayer;
+    };
     var $_ = _ // keep pointer to underscore, as '_' will may be overridden by a closure variable when down the stack
 
     /* add LonLat 4326 definition as default - TODO: isn't this breaking support of certain services ?*/
@@ -1090,46 +1144,6 @@ ol.proj.addProjection(createEPSG4326Proj('EPSG:4326:LONLAT', 'enu'));
             return result;
         };
     }
-    OL_HELPERS.format.KML = _KML;
-
-    OL_HELPERS.createKMLLayer = function (url) {
-
-        // use a custom loader to set source state
-        var kmlLoader = ol.featureloader.loadFeaturesXhr(
-            url,
-            new OL_HELPERS.format.KML({
-                onread: function(node) {
-                    var nameNode = node.querySelector(":scope > name");
-                    var name = nameNode && nameNode.textContent;
-                    name && kml.set('title', name);
-                }
-            }),
-            function(features, dataProjection) {
-                this.addFeatures(features);
-                // set source as ready once features are loaded
-                this.setState(ol.source.State.READY);
-                source.set('waitingOnFirstData', false)
-            },
-            /* FIXME handle error */ ol.nullFunction);
-
-        var source = new ol.source.Vector({
-            loader: function(extent, resolution, projection) {
-                // set source as loading before reading the KML
-                this.setState(ol.source.State.LOADING);
-                return kmlLoader.call(this, extent, resolution, projection)
-            }
-        });
-        //set state as loading to be able to listen on load and grab extent after init
-        source.set('waitingOnFirstData', true)
-
-        var kml = new ol.layer.Vector({
-            style: OL_HELPERS.DEFAULT_STYLEMAP.default,
-            title: 'KML', // TODO extract title from KML
-            source: source
-        });
-
-        return kml;
-    }
 
     /* TODO_OL4 */
     OL_HELPERS.createGFTLayer = function (tableId, GoogleAPIKey) {
@@ -1398,25 +1412,6 @@ ol.proj.addProjection(createEPSG4326Proj('EPSG:4326:LONLAT', 'enu'));
 
                                                 var gmlFormat = gmlFormatVersion == 'GML2' ? new ol.format.GML2() : new ol.format.GML3();
 
-                                                if (gmlFormatVersion == 'GML2' && isLonLat4326) {
-
-                                                    // force lon/lat parsing when needed
-                                                    // WARN this overloading works only with ol-debug lib !
-                                                    gmlFormat.readGeometryElement = function (node, objectStack) {
-                                                        var context = (objectStack[0]);
-                                                        if (node.firstElementChild.getAttribute('srsName') == 'http://www.opengis.net/gml/srs/epsg.xml#4326')
-                                                            context['srsName'] = 'EPSG:4326:LONLAT';
-
-                                                        var geometry = ol.xml.pushParseAndPop(null,
-                                                            this.GEOMETRY_PARSERS_, node, objectStack, this);
-                                                        if (geometry) {
-                                                            return ol.format.Feature.transformWithOptions(geometry, false, context);
-                                                        } else {
-                                                            return undefined;
-                                                        }
-                                                    };
-
-                                                }
 
                                                 var format = new ol.format.WFS({
                                                     //version: ver,
